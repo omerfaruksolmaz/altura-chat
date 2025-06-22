@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Altura Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #667eea;
+            --primary-dark: #5a67d8;
+            --bg-light: #f7fafc;
+            --bg-dark: #1a202c;
+            --text-light: #2d3748;
+            --text-dark: #e2e8f0;
+            --card-light: #ffffff;
+            --card-dark: #2d3748;
+            --border-light: #e2e8f0;
+            --border-dark: #4a5568;
+            --message-bg: #f0f4f8;
+            --message-bg-dark: #2d3748;
+            --own-message: var(--primary-color);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-light);
+            color: var(--text-light);
+            transition: all 0.3s ease;
+        }
+
+        body.dark {
+            background: var(--bg-dark);
+            color: var(--text-dark);
+        }
+
+        .app-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: var(--card-light);
+            border-bottom: 1px solid var(--border-light);
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        body.dark .header {
+            background: var(--card-dark);
+            border-bottom-color: var(--border-dark);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .theme-toggle, .logout-btn {
+            background: none;
+            border: 1px solid var(--border-light);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: all 0.3s ease;
+        }
+
+        body.dark .theme-toggle,
+        body.dark .logout-btn {
+            border-color: var(--border-dark);
+            color: var(--text-dark);
+        }
+
+        .theme-toggle:hover,
+        .logout-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* Main Content */
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--card-light);
+            border-right: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+        }
+
+        body.dark .sidebar {
+            background: var(--card-dark);
+            border-right-color: var(--border-dark);
+        }
+
+        .sidebar-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-light);
+            font-weight: 600;
+        }
+
+        body.dark .sidebar-header {
+            border-bottom-color: var(--border-dark);
+        }
+
+        .channels-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .channel-item {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-light);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        body.dark .channel-item {
+            border-bottom-color: var(--border-dark);
+        }
+
+        .channel-item:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .channel-item.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .channel-icon {
+            font-size: 1.2rem;
+        }
+
+        /* Chat Area */
+        .chat-area {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .chat-header {
+            padding: 1rem 1.5rem;
+            background: var(--card-light);
+            border-bottom: 1px solid var(--border-light);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        body.dark .chat-header {
+            background: var(--card-dark);
+            border-bottom-color: var(--border-dark);
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            display: flex;
+            flex-direction: column;
+            max-width: 70%;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.own {
+            align-self: flex-end;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+            font-size: 0.875rem;
+            opacity: 0.8;
+        }
+
+        .message.own .message-header {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            background: var(--message-bg);
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            word-wrap: break-word;
+        }
+
+        body.dark .message-content {
+            background: var(--message-bg-dark);
+        }
+
+        .message.own .message-content {
+            background: var(--own-message);
+            color: white;
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 1rem 1.5rem;
+            background: var(--card-light);
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        body.dark .input-area {
+            background: var(--card-dark);
+            border-top-color: var(--border-dark);
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-light);
+            border-radius: 25px;
+            background: var(--bg-light);
+            color: var(--text-light);
+            outline: none;
+            font-size: 1rem;
+        }
+
+        body.dark .message-input {
+            border-color: var(--border-dark);
+            background: var(--bg-dark);
+            color: var(--text-dark);
+        }
+
+        .message-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .send-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .send-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Auth Screen */
+        .auth-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-card {
+            background: var(--card-light);
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            margin: 1rem;
+        }
+
+        body.dark .auth-card {
+            background: var(--card-dark);
+        }
+
+        .auth-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--primary-color);
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-input {
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        body.dark .form-input {
+            border-color: var(--border-dark);
+            background: var(--bg-dark);
+            color: var(--text-dark);
+        }
+
+        .form-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .auth-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .auth-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 1rem;
+            color: var(--text-light);
+        }
+
+        body.dark .auth-switch {
+            color: var(--text-dark);
+        }
+
+        .auth-switch button {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -280px;
+                top: 0;
+                height: 100vh;
+                z-index: 100;
+                transition: left 0.3s ease;
+            }
+
+            .sidebar.mobile-open {
+                left: 0;
+            }
+
+            .mobile-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 99;
+            }
+
+            .message {
+                max-width: 85%;
+            }
+
+            .header {
+                padding: 1rem;
+            }
+
+            .input-area {
+                padding: 1rem;
+            }
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: var(--primary-color);
+        }
+
+        .error {
+            color: #e53e3e;
+            text-align: center;
+            margin: 1rem 0;
+            padding: 0.75rem;
+            background: rgba(229, 62, 62, 0.1);
+            border-radius: 8px;
+        }
+
+        .user-status {
+            font-size: 0.875rem;
+            opacity: 0.8;
+        }
+
+        .typing-indicator {
+            padding: 1rem;
+            font-style: italic;
+            opacity: 0.7;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div id="authScreen" class="auth-screen">
+        <div class="auth-card">
+            <h1 class="auth-title">🚀 Altura Chat</h1>
+            <form id="authForm" class="auth-form">
+                <div class="form-group">
+                    <input type="email" id="email" class="form-input" placeholder="E-posta adresiniz" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="password" class="form-input" placeholder="Şifreniz" required>
+                </div>
+                <div id="displayNameGroup" class="form-group hidden">
+                    <input type="text" id="displayName" class="form-input" placeholder="Kullanıcı adınız">
+                </div>
+                <button type="submit" id="authBtn" class="auth-btn">Giriş Yap</button>
+                <div class="auth-switch">
+                    <span id="authSwitchText">Hesabınız yok mu?</span>
+                    <button type="button" id="authSwitchBtn">Kayıt Ol</button>
+                </div>
+                <div id="authError" class="error hidden"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="mainApp" class="app-container hidden">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span>🚀</span>
+                <span>Altura Chat</span>
+            </div>
+            <div class="header-controls">
+                <div class="user-status">
+                    <span id="currentUser"></span>
+                </div>
+                <button id="themeToggle" class="theme-toggle">🌙</button>
+                <button id="logoutBtn" class="logout-btn">Çıkış</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">Kanallar</div>
+                <div class="channels-list">
+                    <div class="channel-item active" data-channel="genel">
+                        <span class="channel-icon">#</span>
+                        <span>Genel</span>
+                    </div>
+                    <div class="channel-item" data-channel="yatirim">
+                        <span class="channel-icon">📈</span>
+                        <span>Yatırım Sohbeti</span>
+                    </div>
+                    <div class="channel-item" data-channel="random">
+                        <span class="channel-icon">🎲</span>
+                        <span>Random</span>
+                    </div>
+                    <div class="channel-item" data-channel="teknoloji">
+                        <span class="channel-icon">💻</span>
+                        <span>Teknoloji</span>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Chat Area -->
+            <main class="chat-area">
+                <div class="chat-header">
+                    <span id="currentChannelIcon">#</span>
+                    <span id="currentChannelName">Genel</span>
+                </div>
+                <div id="messagesContainer" class="messages-container">
+                    <div class="loading">Mesajlar yükleniyor...</div>
+                </div>
+                <div class="input-area">
+                    <input type="text" id="messageInput" class="message-input" placeholder="Bir mesaj yazın..." disabled>
+                    <button id="sendBtn" class="send-btn" disabled>Gönder</button>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Firebase yapılandırması (Bu değerleri kendi Firebase projenizle değiştirin)
+        const firebaseConfig = {
+            // Firebase projenizin yapılandırma bilgilerini buraya ekleyin
+            apiKey: "",
+            authDomain: "",
+            databaseURL: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
+
+        // Firebase başlatma
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+
+        const auth = firebase.auth();
+        const database = firebase.database();
+
+        // Uygulama durumu
+        let currentUser = null;
+        let currentChannel = 'genel';
+        let isLogin = true;
+        let messagesRef = null;
+
+        // DOM elementleri
+        const authScreen = document.getElementById('authScreen');
+        const mainApp = document.getElementById('mainApp');
+        const authForm = document.getElementById('authForm');
+        const authBtn = document.getElementById('authBtn');
+        const authSwitchBtn = document.getElementById('authSwitchBtn');
+        const authSwitchText = document.getElementById('authSwitchText');
+        const displayNameGroup = document.getElementById('displayNameGroup');
+        const authError = document.getElementById('authError');
+        const themeToggle = document.getElementById('themeToggle');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const currentUserSpan = document.getElementById('currentUser');
+        const channelItems = document.querySelectorAll('.channel-item');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const currentChannelIcon = document.getElementById('currentChannelIcon');
+        const currentChannelName = document.getElementById('currentChannelName');
+
+        // Theme toggle
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark');
+            themeToggle.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+        });
+
+        // Auth form toggle
+        authSwitchBtn.addEventListener('click', () => {
+            isLogin = !isLogin;
+            if (isLogin) {
+                authBtn.textContent = 'Giriş Yap';
+                authSwitchText.textContent = 'Hesabınız yok mu?';
+                authSwitchBtn.textContent = 'Kayıt Ol';
+                displayNameGroup.classList.add('hidden');
+            } else {
+                authBtn.textContent = 'Kayıt Ol';
+                authSwitchText.textContent = 'Zaten hesabınız var mı?';
+                authSwitchBtn.textContent = 'Giriş Yap';
+                displayNameGroup.classList.remove('hidden');
+            }
+            hideError();
+        });
+
+        // Auth form submit
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const displayName = document.getElementById('displayName').value;
+            
+            hideError();
+            authBtn.disabled = true;
+            authBtn.textContent = 'İşlem yapılıyor...';
+            
+            try {
+                if (isLogin) {
+                    await auth.signInWithEmailAndPassword(email, password);
+                } else {
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    if (displayName) {
+                        await userCredential.user.updateProfile({
+                            displayName: displayName
+                        });
+                    }
+                }
+            } catch (error) {
+                showError(getErrorMessage(error.code));
+                authBtn.disabled = false;
+                authBtn.textContent = isLogin ? 'Giriş Yap' : 'Kayıt Ol';
+            }
+        });
+
+        // Logout
+        logoutBtn.addEventListener('click', () => {
+            auth.signOut();
+        });
+
+        // Channel selection
+        channelItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const channel = item.dataset.channel;
+                switchChannel(channel);
+                
+                // Update active channel
+                channelItems.forEach(ch => ch.classList.remove('active'));
+                item.classList.add('active');
+                
+                // Update header
+                const icon = item.querySelector('.channel-icon').textContent;
+                const name = item.querySelector('span:last-child').textContent;
+                currentChannelIcon.textContent = icon;
+                currentChannelName.textContent = name;
+            });
+        });
+
+        // Message input
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        sendBtn.addEventListener('click', sendMessage);
+
+        // Auth state observer
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                currentUserSpan.textContent = user.displayName || user.email;
+                showMainApp();
+                connectToChat();
+            } else {
+                currentUser = null;
+                showAuthScreen();
+                disconnectFromChat();
+            }
+        });
+
+        function showAuthScreen() {
+            authScreen.classList.remove('hidden');
+            mainApp.classList.add('hidden');
+        }
+
+        function showMainApp() {
+            authScreen.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+            messageInput.disabled = false;
+            sendBtn.disabled = false;
+        }
+
+        function showError(message) {
+            authError.textContent = message;
+            authError.classList.remove('hidden');
+        }
+
+        function hideError() {
+            authError.classList.add('hidden');
+        }
+
+        function getErrorMessage(errorCode) {
+            const messages = {
+                'auth/user-not-found': 'Kullanıcı bulunamadı.',
+                'auth/wrong-password': 'Hatalı şifre.',
+                'auth/email-already-in-use': 'Bu e-posta adresi zaten kullanımda.',
+                'auth/weak-password': 'Şifre çok zayıf.',
+                'auth/invalid-email': 'Geçersiz e-posta adresi.',
+                'auth/too-many-requests': 'Çok fazla deneme. Lütfen daha sonra tekrar deneyin.'
+            };
+            return messages[errorCode] || 'Bir hata oluştu. Lütfen tekrar deneyin.';
+        }
+
+        function connectToChat() {
+            switchChannel(currentChannel);
+        }
+
+        function disconnectFromChat() {
+            if (messagesRef) {
+                messagesRef.off();
+                messagesRef = null;
+            }
+        }
+
+        function switchChannel(channel) {
+            // Disconnect from previous channel
+            if (messagesRef) {
+                messagesRef.off();
+            }
+            
+            currentChannel = channel;
+            messagesContainer.innerHTML = '<div class="loading">Mesajlar yükleniyor...</div>';
+            
+            // Connect to new channel
+            messagesRef = database.ref(`messages/${channel}`);
+            messagesRef.orderByChild('timestamp').limitToLast(50).on('value', (snapshot) => {
+                displayMessages(snapshot.val() || {});
+            });
+        }
+
+        function displayMessages(messages) {
+            messagesContainer.innerHTML = '';
+            
+            const messageArray = Object.entries(messages).map(([id, msg]) => ({
+                id,
+                ...msg
+            }));
+            
+            messageArray.sort((a, b) => a.timestamp - b.timestamp);
+            
+            messageArray.forEach(message => {
+                const messageEl = createMessageElement(message);
+                messagesContainer.appendChild(messageEl);
+            });
+            
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function createMessageElement(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${message.userId === currentUser.uid ? 'own' : ''}`;
+            
+            const time = new Date(message.timestamp).toLocaleTimeString('tr-TR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <span class="message-author">${message.displayName || 'Anonim'}</span>
+                    <span class="message-time">${time}</span>
+                </div>
+                <div class="message-content">${escapeHtml(message.text)}</div>
+            `;
+            
+            return messageDiv;
+        }
+
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || !currentUser) return;
+            
+            const message = {
+                text,
+                userId: currentUser.uid,
+                displayName: currentUser.displayName || currentUser.email,
+                timestamp: Date.now()
+            };
+            
+            database.ref(`messages/${currentChannel}`).push(message);
+            messageInput.value = '';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Demo messages for testing (remove in production)
+        function addDemoMessages() {
+            if (!currentUser) return;
+            
+            const demoMessages = [
+                { text: 'Altura Chat\'e hoş geldiniz! 🎉', channel: 'genel' },
+                { text: 'Bitcoin bugün nasıl gidiyor?', channel: 'yatirim' },
+                { text: 'Yeni teknolojiler hakkında ne düşünüyorsunuz?', channel: 'teknoloji' },
+                { text: 'Rastgele sohbet için burası mükemmel!', channel: 'random' }
+            ];
+            
+            // Only add demo messages if channels are empty
+            database.ref('messages/genel').once('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    setTimeout(() => {
+                        demoMessages.forEach((demo, index) => {
+                            setTimeout(() => {
+                                const message = {
+                                    text: demo.text,
+                                    userId: 'demo-user',
+                                    displayName: 'Altura Bot',
+                                    timestamp: Date.now()
+                                };
+                                database.ref(`messages/${demo.channel}`).push(message);
+                            }, index * 1000);
+                        });
+                    }, 2000);
+                }
+            });
+        }
+
+        // Initialize demo messages after authentication
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                setTimeout(addDemoMessages, 3000);
+            }
+        });
+
+        
+    </script>
+</body>
+</html>
