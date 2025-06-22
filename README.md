@@ -81,7 +81,8 @@ Once launched, the Firebase authentication screen will greet you, allowing you t
 
 ## 🧪 Screenshots
 
-![image](https://github.com/user-attachments/assets/239d958f-2b59-4cd6-a88f-5ca86b7447d0)
+![image](https://github.com/user-attachments/assets/a02d8397-abb6-46f4-96f8-8ce09cdc09e9)
+
 
 
 ---
